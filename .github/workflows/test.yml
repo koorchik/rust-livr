@@ -1,0 +1,50 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The lowest supported Rust (rust-version in Cargo.toml) and the latest one
+        rust: ['1.88', stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      # Everything but the compile-fail tests (livr/tests/ui): their messages
+      # change with Rust versions, so they run on one pinned toolchain
+      - run: cargo test --workspace --exclude livr && cargo test -p livr --test typed && cargo test -p livr --doc
+      # The expected messages are those of the lowest supported Rust, which
+      # never changes: TRYBUILD=overwrite cargo +1.88.0 test -p livr --test ui
+      - if: matrix.rust == '1.88'
+        run: cargo test -p livr --test ui
+      # Objects in insertion order, as other crates may turn it on for serde_json
+      - run: cargo test -p livr-core --features preserve_order
+      - run: cargo build -p livr --no-default-features
+      - run: cargo build -p livr-wasm --target wasm32-unknown-unknown
+      # Lints, formatting and documentation change with Rust versions: only the latest one
+      - if: matrix.rust == 'stable'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - if: matrix.rust == 'stable'
+        run: cargo fmt --all --check
+      - if: matrix.rust == 'stable'
+        run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: -D warnings
+      # The published crates package and build on their own (`cargo package
+      # --workspace` would stop at the unpublished livr-typed-suite)
+      - if: matrix.rust == 'stable'
+        run: cargo publish --workspace --dry-run

@@ -1,0 +1,9 @@
+{
+    "field1": "some value",
+    "field2": "some value",
+    "field3": "some value",
+    "empty_field":  "",
+    "extra_field": "some value",
+    "number_as_string": "10",
+    "number_as_number": 10
+}

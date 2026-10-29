@@ -1,0 +1,5 @@
+error: duplicate key `b`
+ --> tests/ui/duplicate_key.rs:3:45
+  |
+3 |         a: {"nested_object": {b: "integer", b: "string"}},
+  |                                             ^

@@ -1,0 +1,15 @@
+[package]
+name = "livr-typed-suite"
+description = "The LIVR test suite with typed schemas: every case as a livr::schema!"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+livr = { path = "../livr" }
+serde_json.workspace = true
+serde.workspace = true
+
+[build-dependencies]
+serde_json.workspace = true
+serde.workspace = true

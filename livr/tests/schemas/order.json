@@ -1,0 +1,7 @@
+{
+    "id": ["required", "positive_integer"],
+    "items": ["required", "not_empty_list", {"list_of_objects": {
+        "sku": ["required", "string"],
+        "quantity": ["required", "positive_integer"]
+    }}]
+}

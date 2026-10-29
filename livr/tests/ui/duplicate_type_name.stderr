@@ -1,0 +1,11 @@
+error: the type name `Addr` is used twice
+ --> tests/ui/duplicate_type_name.rs:4:54
+  |
+4 |         work: {"nested_object": {city: "string"}} as Addr,
+  |                                                      ^^^^
+
+error: `T` is already the name of the schema
+  --> tests/ui/duplicate_type_name.rs:10:54
+   |
+10 |         home: {"nested_object": {city: "string"}} as T,
+   |                                                      ^

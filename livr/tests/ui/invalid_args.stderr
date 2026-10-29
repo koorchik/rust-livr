@@ -1,0 +1,5 @@
+error: rule [max_length] expects a number, got "long"
+ --> tests/ui/invalid_args.rs:3:9
+  |
+3 |         name: {"max_length": "long"},
+  |         ^^^^

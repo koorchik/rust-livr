@@ -1,0 +1,11 @@
+error: `num` is already the name of a custom rule
+ --> tests/ui/rule_and_alias_names.rs:9:13
+  |
+9 |     #[alias(num = ["string"])]
+  |             ^^^
+
+error: `fooBar` is the same rule name as `foo_bar` in camelCase, already the name of a custom rule
+  --> tests/ui/rule_and_alias_names.rs:17:13
+   |
+17 |     #[alias(fooBar = ["string"])]
+   |             ^^^^^^

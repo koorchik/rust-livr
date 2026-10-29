@@ -1,0 +1,5 @@
+error: alias [a]: alias [b] is recursive
+ --> tests/ui/recursive_alias.rs:2:13
+  |
+2 |     #[alias(a = ["required", "b"])]
+  |             ^

@@ -1,0 +1,30 @@
+[package]
+name = "livr-macros"
+description = "The schema! macro of the livr crate: typed LIVR 2.0 schemas"
+keywords = ["validation", "livr", "schema", "macro"]
+categories = ["data-structures", "encoding"]
+readme = "README.md"
+documentation = "https://docs.rs/livr"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = "3"
+# Which characters can be in the names of generated types
+unicode-ident = "1"
+# Declaration order of the fields of schemas
+serde_json = { workspace = true, features = ["preserve_order"] }
+livr-core.workspace = true

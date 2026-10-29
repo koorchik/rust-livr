@@ -1,0 +1,38 @@
+[package]
+name = "livr"
+description = "LIVR 2.0 validator for Rust: all errors at once, rules as JSON, types inferred from schemas"
+keywords = ["validation", "livr", "validator", "schema", "json"]
+categories = ["data-structures", "encoding"]
+# The README of the repository: cargo packages it as README.md
+readme = "../README.md"
+documentation = "https://docs.rs/livr"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = ["macros"]
+# The schema! macro; its types derive serde::Serialize
+macros = ["dep:livr-macros", "serde/derive"]
+# Objects keep the order of their fields (serde_json/preserve_order)
+preserve_order = ["livr-core/preserve_order"]
+
+[dependencies]
+livr-core.workspace = true
+livr-macros = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+trybuild = "1"
+
+[[bench]]
+name = "validate"
+harness = false

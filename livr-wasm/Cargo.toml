@@ -1,0 +1,18 @@
+[package]
+name = "livr-wasm"
+description = "LIVR validator for JavaScript, compiled to WebAssembly"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+livr-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "=0.2.129"

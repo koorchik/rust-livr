@@ -1,0 +1,32 @@
+name: Bug report
+description: Validation gives a wrong result, a schema is rejected or accepted wrongly, or something crashes
+labels: [bug]
+body:
+  - type: textarea
+    id: schema
+    attributes:
+      label: Schema
+      description: The LIVR rules, or the `schema!` invocation
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Input
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: livr 0.1.0, rustc 1.88.0
+    validations:
+      required: true

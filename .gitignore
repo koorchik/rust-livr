@@ -1,0 +1,4 @@
+/target
+Cargo.lock.bak
+/bench-js/node_modules
+/livr-wasm/pkg

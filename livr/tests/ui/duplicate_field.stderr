@@ -1,0 +1,5 @@
+error: duplicate field `a`
+ --> tests/ui/duplicate_field.rs:4:9
+  |
+4 |         a: "string",
+  |         ^

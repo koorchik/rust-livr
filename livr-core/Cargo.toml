@@ -1,0 +1,42 @@
+[package]
+name = "livr-core"
+description = "The engine of the livr crate: LIVR 2.0 validation rules at run time"
+keywords = ["validation", "livr", "validator", "schema", "json"]
+categories = ["data-structures", "encoding"]
+readme = "README.md"
+documentation = "https://docs.rs/livr-core"
+# The LIVR test suite is a copy from the specification (Artistic-2.0): its
+# tests skip it when it is missing
+exclude = ["tests/test_suite"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+# Objects keep the order of their fields (serde_json/preserve_order)
+preserve_order = ["serde_json/preserve_order"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+ryu-js.workspace = true
+
+[dev-dependencies]
+libtest-mimic = "0.8"
+serde = { workspace = true, features = ["derive"] }
+
+[[test]]
+name = "test_suite"
+harness = false
+
+[[test]]
+name = "camel_case"
+harness = false

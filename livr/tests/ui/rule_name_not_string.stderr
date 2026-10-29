@@ -1,0 +1,5 @@
+error: expected a JSON value: a rule name is a string, like "required"
+ --> tests/ui/rule_name_not_string.rs:3:16
+  |
+3 |         name: [required],
+  |                ^^^^^^^^
