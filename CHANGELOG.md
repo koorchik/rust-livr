@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-29)
 
 - The rules of the LIVR specification 2.0: all 70 cases of the test suite
   pass, also with camelCase rule names, owned data and typed schemas.
