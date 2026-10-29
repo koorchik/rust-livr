@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Rust implementation of the LIVR specification 2.0 (https://livr-spec.org). Performance is a priority: measure changes on hot paths with the benchmark. Type inference of `schema!` must stay sound: for every valid data, the output fits the generated types.
+A Rust implementation of the LIVR specification 2.0 (https://livr-spec.org). Performance matters (measure changes on hot paths with the benchmark), but a convenient public API comes first: don't trade ergonomics for a small speedup. Big measured wins that keep the API are welcome. Type inference of `schema!` must stay sound: for every valid data, the output fits the generated types.
 
 ## Commands
 
@@ -18,6 +18,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
 cargo publish --workspace --dry-run --allow-dirty  # the published crates build from their packages
 taskset -c 9 cargo bench -p livr                # benchmark (best of 5 runs); pin it, other processes disturb it
 livr-wasm/build.sh && taskset -c 9 node bench-js/bench.mjs   # WebAssembly build and the JavaScript comparison
+cp -r ../LIVR/test_suite livr-core/tests/            # refresh the copy of the LIVR test suite (change it in the specification first)
 ```
 
 ## Architecture
@@ -72,6 +73,15 @@ Strict, like dart-livr and the LIVR 3 draft, and listed in README.md (keep it in
 The generated code validates fields itself (`TypedObject`) when the last rule is `nested_object`, `list_of_objects` or `list_of`; otherwise it runs the rules of the field and converts the output. The typed suite checks both paths against the test suite.
 
 The rules of a field are compiled ahead of time (`aot.rs`): a function per field that calls each rule with `__private::step`, like `Chain::run` does. Rules without heap data are constants, the others are built once from their arguments in a `LazyLock`; metarules inside a chain, aliases and custom rules are compiled by the engine. A rule constructor used there (`MaxLength::new`) is part of the contract between the crates: keep it `const` and in sync with `build`.
+
+## Release
+
+1. Bump `version` in the root `Cargo.toml` and the exact pins `=x.y.z` of `livr-core` and `livr-macros` next to it: the generated code uses internals of livr-core, so the three crates are released together with the same version.
+2. Add the version to `CHANGELOG.md`; run the commands above, including `cargo publish --workspace --dry-run`.
+3. Commit, tag `vX.Y.Z`, push, and create a GitHub release from the CHANGELOG entry.
+4. `cargo publish --workspace` publishes livr-core, livr-macros and livr in order and waits for the index (cargo 1.90 or newer).
+5. Then `rust-livr-axum`: raise its `livr` version if it needs the new release, and publish it (see its CLAUDE.md).
+6. The LIVR site ([koorchik/LIVR](https://github.com/koorchik/LIVR)) runs `conformance/rust` against `livr` from crates.io, with the requirement `livr = "0.1"`: a 0.1.x release shows up on the next deploy; for 0.2 update `conformance/rust/Cargo.toml` there. `NATIVE=1 LIVR_RUST_PATH="$PWD/../rust-livr" conformance/run.sh rust`, run in the LIVR checkout, tests this checkout instead (an absolute path; the Docker mode always uses crates.io).
 
 ## Code style
 
