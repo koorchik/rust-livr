@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "livr"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "livr-core",
  "livr-macros",
@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "livr-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libtest-mimic",
  "regex",
@@ -248,7 +248,7 @@ dependencies = [
 
 [[package]]
 name = "livr-macros"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "livr-core",
  "proc-macro2",
@@ -269,7 +269,7 @@ dependencies = [
 
 [[package]]
 name = "livr-wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "livr-core",
  "serde",

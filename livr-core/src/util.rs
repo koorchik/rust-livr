@@ -53,9 +53,81 @@ pub fn to_js_string(value: &Value) -> Cow<'_, str> {
 #[doc(hidden)]
 pub fn number_to_js_string(number: &Number) -> String {
     match number.as_f64() {
-        Some(float) if number.is_f64() => ryu_js::Buffer::new().format(float).to_owned(),
+        Some(float) if number.is_f64() => float_to_js_string(float),
         _ => number.to_string(),
     }
+}
+
+/// `Number::toString` of the ECMAScript specification: the shortest digits
+/// that give the number back, laid out with an exponent from 1e21 and below
+/// 1e-6.
+fn float_to_js_string(float: f64) -> String {
+    use std::fmt::Write;
+
+    if float == 0.0 {
+        // -0 too
+        return "0".to_owned();
+    }
+    if !float.is_finite() {
+        // serde_json numbers are finite; for completeness
+        return if float.is_nan() {
+            "NaN"
+        } else if float > 0.0 {
+            "Infinity"
+        } else {
+            "-Infinity"
+        }
+        .to_owned();
+    }
+    let abs = float.abs();
+    // The shortest digits; when two of that length are equally close, Rust
+    // may pick either, JavaScript picks the even one. Rounding the exact
+    // value to that length rounds ties to even.
+    let shortest = format!("{abs:e}");
+    let len = shortest.find('e').unwrap_or(shortest.len()) - usize::from(shortest.contains('.'));
+    let exact = format!("{abs:.*e}", len - 1);
+    let sci = if exact.parse::<f64>() == Ok(abs) {
+        exact
+    } else {
+        shortest
+    };
+
+    let (mantissa, exponent) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let digits = mantissa.replace('.', "");
+    let len = digits.len() as i32;
+    // The decimal point goes after `point` digits
+    let point = exponent.parse::<i32>().unwrap_or(0) + 1;
+
+    let mut out = String::with_capacity(len as usize + 8);
+    if float < 0.0 {
+        out.push('-');
+    }
+    if len <= point && point <= 21 {
+        out.push_str(&digits);
+        out.extend(std::iter::repeat_n('0', (point - len) as usize));
+    } else if 0 < point && point <= 21 {
+        out.push_str(&digits[..point as usize]);
+        out.push('.');
+        out.push_str(&digits[point as usize..]);
+    } else if -6 < point && point <= 0 {
+        out.push_str("0.");
+        out.extend(std::iter::repeat_n('0', (-point) as usize));
+        out.push_str(&digits);
+    } else {
+        out.push_str(&digits[..1]);
+        if len > 1 {
+            out.push('.');
+            out.push_str(&digits[1..]);
+        }
+        let exponent = point - 1;
+        let _ = write!(
+            out,
+            "e{}{}",
+            if exponent < 0 { '-' } else { '+' },
+            exponent.abs()
+        );
+    }
+    out
 }
 
 /// A number parsed from a string: an integer when it fits `i64`.
@@ -311,6 +383,57 @@ mod tests {
         assert_eq!(to_js_string(&json!(1.5)), "1.5");
         assert_eq!(to_js_string(&json!(1e21)), "1e+21");
         assert_eq!(to_js_string(&json!(true)), "true");
+    }
+
+    #[test]
+    fn formats_floats_like_javascript() {
+        // String(x) in Node.js
+        let cases = [
+            (10.0, "10"),
+            (-3.0, "-3"),
+            (-0.0, "0"),
+            (0.1, "0.1"),
+            (2.5, "2.5"),
+            (1e20, "100000000000000000000"),
+            (123_456_789_012_345_680_000.0, "123456789012345680000"),
+            (1e21, "1e+21"),
+            (1.5e21, "1.5e+21"),
+            (1e-6, "0.000001"),
+            (1.234e-6, "0.000001234"),
+            (1e-7, "1e-7"),
+            (1.5e-7, "1.5e-7"),
+            (5e-324, "5e-324"),
+            (f64::MAX, "1.7976931348623157e+308"),
+            (f64::MIN_POSITIVE, "2.2250738585072014e-308"),
+            // Exactly between ...562.2 and ...562.3: the even digit
+            (1_658_206_780_088_562.2, "1658206780088562.2"),
+        ];
+        for (float, expected) in cases {
+            assert_eq!(float_to_js_string(float), expected, "{float:e}");
+        }
+    }
+
+    #[test]
+    fn formats_random_floats_like_ryu_js() {
+        let mut buffer = ryu_js::Buffer::new();
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        for _ in 0..200_000 {
+            // xorshift64
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let float = f64::from_bits(state);
+            if float.is_finite() {
+                assert_eq!(
+                    float_to_js_string(float),
+                    buffer.format(float),
+                    "{state:#x}"
+                );
+            }
+            #[allow(clippy::cast_precision_loss)]
+            let short = (state % 100_000_000) as f64 / 1000.0;
+            assert_eq!(float_to_js_string(short), buffer.format(short));
+        }
     }
 
     #[test]

@@ -85,4 +85,4 @@ The rules of a field are compiled ahead of time (`aot.rs`): a function per field
 
 ## Code style
 
-`cargo fmt`, clippy without warnings, `#![forbid(unsafe_code)]`, edition 2024, rust-version 1.88. Comments explain why, in plain sentences. Zero runtime dependencies beyond serde, serde_json, regex and ryu-js.
+`cargo fmt`, clippy without warnings, `#![forbid(unsafe_code)]`, edition 2024, rust-version 1.88. Comments explain why, in plain sentences. Zero runtime dependencies beyond serde, serde_json and regex.

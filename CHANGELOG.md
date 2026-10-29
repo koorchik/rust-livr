@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1 (2026-10-29)
+
+- One runtime dependency less: numbers are written as strings like
+  JavaScript's `String()` (`10.0` as `"10"`, `1e21` as `"1e+21"`) with the
+  standard library instead of `ryu-js`. The output is the same; a test checks
+  it against `ryu-js` on random numbers, and the formatting was compared with
+  Node.js on a million of them.
+
 ## 0.1.0 (2026-10-29)
 
 - The rules of the LIVR specification 2.0: all 70 cases of the test suite

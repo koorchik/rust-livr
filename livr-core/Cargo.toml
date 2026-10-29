@@ -27,10 +27,11 @@ preserve_order = ["serde_json/preserve_order"]
 serde.workspace = true
 serde_json.workspace = true
 regex.workspace = true
-ryu-js.workspace = true
 
 [dev-dependencies]
 libtest-mimic = "0.8"
+# The reference for the formatting of numbers like JavaScript
+ryu-js = "1"
 serde = { workspace = true, features = ["derive"] }
 
 [[test]]
