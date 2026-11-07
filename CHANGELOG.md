@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.2.0 (2026-11-07)
+
+- The rules of the LIVR 2.5 draft: `boolean`, `not_one_of`, `max_decimals`,
+  `digits`, `starts_with`, `ends_with`, `contains`, `iso_datetime`,
+  `iso_time`, `required_if`, `when`, `values`, `keys`, `any`, `list_length`,
+  `unique`, `split`, the formats `uuid`, `ip`, `cidr`, `hostname`, `base64`,
+  `hex`, `digest`, `mongo_id`, `hex_color`, `mac`, `e164`, `semver`, `jwt`, and
+  the checksums `luhn`, `credit_card`, `iban`. `iso_date` takes bounds,
+  `{"min": ..., "max": ...}` (dates, `today`, `yesterday`, `tomorrow`). All
+  cases of the 2.5 test suite pass, its schema errors included, also with
+  camelCase names and as typed schemas, which infer `bool` for `boolean` and
+  maps for `values` and `keys`.
+- Arguments of the new rules as the draft defines them: the arguments after
+  the ones a rule takes are ignored (`{"split": [",", ";"]}`), a number and a
+  string with a number are the same (`{"max_decimals": "2"}`, `{"split": 1}`),
+  and `{"rule": null}` is one `null` argument, a schema error for them
+  (`{"boolean": null}`). The 2.0 rules and custom rules keep their argument
+  handling (`{"default": null}` sets `null`, `{"iso_date": null}` is
+  `"iso_date"`).
+- `ValidatorBuilder::now` and `ValidatorBuilder::clock`: the current time of
+  `today`, `yesterday` and `tomorrow` (UTC). `schema!` takes `#[clock(path)]`,
+  a `fn() -> SystemTime`, for the same.
+- Changed, as LIVR 2.5 fixes 2.0: the rules of aliases and of `or` see the
+  object of the field (`equal_to_field` in an alias compares with a sibling of
+  the field), the rules of `list_of` items see no other fields. `iso_date`
+  with a first argument that is not an object (`{"iso_date": "today"}`,
+  ignored by LIVR 2.0) is a schema error. A custom rule registered with a new
+  standard name (`starts_with`, `uuid`) replaces the built-in one.
+- The copy of the 2.0 test suite has the new cases (`like` with `^` and `$`,
+  integers in `decimal`, `null` kept in the output, `list_of*` on an object, a
+  modifier in `or`, `iso_date` in the proleptic Gregorian calendar). They
+  passed without code changes.
+
 ## 0.1.1 (2026-10-29)
 
 - One runtime dependency less: numbers are written as strings like
