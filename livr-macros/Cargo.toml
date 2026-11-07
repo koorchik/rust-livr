@@ -1,6 +1,6 @@
 [package]
 name = "livr-macros"
-description = "The schema! macro of the livr crate: typed LIVR 2.0 schemas"
+description = "The schema! macro of the livr crate: typed LIVR 2.0 and LIVR 2.5 schemas"
 keywords = ["validation", "livr", "schema", "macro"]
 categories = ["data-structures", "encoding"]
 readme = "README.md"

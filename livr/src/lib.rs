@@ -1,8 +1,9 @@
-//! A Rust implementation of the LIVR 2.0 specification (Language Independent
-//! Validation Rules, <https://livr-spec.org>). It passes the full official
-//! test suite: all 70 cases, also with camelCase rule names and as typed
-//! schemas. The rules of the LIVR 2.5 draft are implemented too. LIVR rules
-//! are declarative and the same in all languages.
+//! A Rust implementation of LIVR 2.0 and LIVR 2.5 (Language Independent
+//! Validation Rules, <https://livr-spec.org>; the
+//! [LIVR 2.5 specification](https://github.com/koorchik/LIVR/blob/master/drafts/v2.5.md)).
+//! It passes the full official test suites, also with camelCase rule names
+//! and as typed schemas. LIVR rules are declarative and the same in all
+//! languages; the list is on <https://livr-spec.org/validation-rules.html>.
 //!
 //! - **All errors in one pass:** every field is checked, in nested objects
 //!   and lists too, and gets the error code of its first failing rule.
@@ -106,11 +107,11 @@
 //!
 //! # Semantics
 //!
-//! The rules follow the LIVR specification 2.0 and its test suite. Where it
-//! leaves something open, this implementation is strict: numbers in strings
-//! are decimal only, booleans are not numbers, integers fit `i64`, lengths
-//! count characters, and `like` matches like a JavaScript regular expression
-//! without the `u` flag. The
+//! The rules follow the LIVR specifications 2.0 and 2.5 and their test
+//! suites. Where they leave something open, this implementation is strict:
+//! numbers in strings are decimal only, booleans are not numbers, integers
+//! fit `i64`, lengths count characters, and `like` matches like a JavaScript
+//! regular expression without the `u` flag. The
 //! [README](https://github.com/koorchik/rust-livr#semantics) has the
 //! details.
 //!

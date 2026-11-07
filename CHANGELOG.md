@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 (2026-11-07)
+
+- Docs: LIVR 2.5 is released, not a draft. The README lists all the rules,
+  of LIVR 2.0 and of LIVR 2.5.
+
 ## 0.2.0 (2026-11-07)
 
 - The rules of the LIVR 2.5 draft: `boolean`, `not_one_of`, `max_decimals`,

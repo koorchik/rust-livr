@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Rust implementation of the LIVR specification 2.0 (https://livr-spec.org) and the rules of the LIVR 2.5 draft (`../LIVR/drafts/v2.5.md`). Performance matters (measure changes on hot paths with the benchmark), but a convenient public API comes first: don't trade ergonomics for a small speedup. Big measured wins that keep the API are welcome. Type inference of `schema!` must stay sound: for every valid data, the output fits the generated types.
+A Rust implementation of LIVR 2.0 and LIVR 2.5 (https://livr-spec.org; the 2.5 specification is `../LIVR/drafts/v2.5.md`). Performance matters (measure changes on hot paths with the benchmark), but a convenient public API comes first: don't trade ergonomics for a small speedup. Big measured wins that keep the API are welcome. Type inference of `schema!` must stay sound: for every valid data, the output fits the generated types.
 
 ## Commands
 

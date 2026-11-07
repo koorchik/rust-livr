@@ -3,11 +3,11 @@
 [![CI](https://github.com/koorchik/rust-livr/actions/workflows/test.yml/badge.svg)](https://github.com/koorchik/rust-livr/actions/workflows/test.yml)
 [![crates.io](https://img.shields.io/crates/v/livr.svg)](https://crates.io/crates/livr)
 [![docs.rs](https://img.shields.io/docsrs/livr)](https://docs.rs/livr)
-[![LIVR 2.0](https://img.shields.io/badge/LIVR-2.0-blue)](https://livr-spec.org)
+[![LIVR 2.0 and 2.5](https://img.shields.io/badge/LIVR-2.0%20%7C%202.5-blue)](https://livr-spec.org)
 [![MSRV 1.88](https://img.shields.io/badge/MSRV-1.88-orange)](https://blog.rust-lang.org/2025/06/26/Rust-1.88.0/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/koorchik/rust-livr/blob/master/LICENSE)
 
-A Rust implementation of the [LIVR 2.0 specification](https://livr-spec.org) (Language Independent Validation Rules). It passes the full official test suite: all 70 cases, also with camelCase rule names and as typed schemas. The rules of the LIVR 2.5 draft are implemented too ([below](#livr-25-draft)).
+A Rust implementation of LIVR 2.0 and LIVR 2.5 ([LIVR 2.0 specification](https://livr-spec.org), [LIVR 2.5 specification](https://github.com/koorchik/LIVR/blob/master/drafts/v2.5.md); Language Independent Validation Rules). It passes the full official test suites, also with camelCase rule names and as typed schemas. The [rules](#rules) of both versions are implemented.
 
 **Every error of every field, in one response.** livr never stops at the first error: it checks all the fields, in nested objects and in every item of a list, and gives an error code for each invalid one, the type errors too. The frontend highlights every wrong field at once.
 
@@ -228,7 +228,7 @@ livr::schema! {
 }
 ```
 
-`#[rule(...)]` takes `output = Type` (the type does not change when it is left out) and `present` (the rule makes the field present). The output type implements `livr::FromLivr` and `livr::FromLivrRef`. `#[clock(path)]` sets the clock of `today` ([LIVR 2.5](#livr-25-draft)).
+`#[rule(...)]` takes `output = Type` (the type does not change when it is left out) and `present` (the rule makes the field present). The output type implements `livr::FromLivr` and `livr::FromLivrRef`. `#[clock(path)]` sets the clock of `today` ([LIVR 2.5](#rules-added-in-livr-25)).
 
 ## Schemas known at run time: `Validator`
 
@@ -299,9 +299,22 @@ These follow the LIVR specification and its test suite. Where the specification 
 - **`like`** takes JavaScript regular expressions (without the `u` flag) and matches like JavaScript: `\d`, `\w` and `\b` are ASCII only, also with the `i` flag (`k` matches `K` but not the Kelvin sign `K`); `\s` is the whitespace of JavaScript; `.` does not match line terminators; an escaped letter without a meaning is the letter (`\z` is `z`, `\p{L}` is `p{L}`). Look-around, backreferences and inline flags are schema errors. A character beyond U+FFFF is one character, not two UTF-16 units as in JavaScript. Matching takes linear time.
 - **Numbers to strings** follow JavaScript: `10.0` is `"10"`.
 
-## LIVR 2.5 draft
+## Rules
 
-The rules of the [LIVR 2.5 draft](https://github.com/koorchik/LIVR/blob/master/drafts/v2.5.md), with its test suite (`livr-core/tests/test_suite_2.5`):
+All the rules of LIVR 2.0 and LIVR 2.5 ([the rules on livr-spec.org](https://livr-spec.org/validation-rules.html)).
+
+LIVR 2.0, with its test suite (`livr-core/tests/test_suite`):
+
+- common: `required`, `not_empty`, `not_empty_list`, `any_object`;
+- strings: `string`, `eq`, `one_of`, `max_length`, `min_length`, `length_between`, `length_equal`, `like`;
+- numbers: `integer`, `positive_integer`, `decimal`, `positive_decimal`, `max_number`, `min_number`, `number_between`;
+- special: `email`, `url`, `iso_date`, `equal_to_field`;
+- metarules: `nested_object`, `variable_object`, `list_of`, `list_of_objects`, `list_of_different_objects`, `or`;
+- modifiers: `trim`, `to_lc`, `to_uc`, `remove`, `leave_only`, `default`.
+
+### Rules added in LIVR 2.5
+
+The rules added in the [LIVR 2.5 specification](https://github.com/koorchik/LIVR/blob/master/drafts/v2.5.md), with its test suite (`livr-core/tests/test_suite_2.5`):
 
 - types and numbers: `boolean`, `not_one_of`, `max_decimals`;
 - strings: `digits`, `starts_with`, `ends_with`, `contains`;

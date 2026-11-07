@@ -1,9 +1,10 @@
 //! The engine of the [`livr`](https://docs.rs/livr) crate. Use `livr`, which
 //! re-exports this crate and adds typed schemas.
 //!
-//! LIVR 2.0 (Language Independent Validation Rules, <https://livr-spec.org>)
-//! and the rules of the LIVR 2.5 draft: declarative validation rules, the
-//! same in all languages.
+//! LIVR 2.0 and LIVR 2.5 (Language Independent Validation Rules,
+//! <https://livr-spec.org>; the
+//! [LIVR 2.5 specification](https://github.com/koorchik/LIVR/blob/master/drafts/v2.5.md)):
+//! declarative validation rules, the same in all languages.
 //!
 //! ```
 //! use livr_core::Validator;

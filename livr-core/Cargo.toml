@@ -1,6 +1,6 @@
 [package]
 name = "livr-core"
-description = "The engine of the livr crate: LIVR 2.0 validation rules at run time"
+description = "The engine of the livr crate: LIVR 2.0 and LIVR 2.5 validation rules at run time"
 keywords = ["validation", "livr", "validator", "schema", "json"]
 categories = ["data-structures", "encoding"]
 readme = "README.md"
