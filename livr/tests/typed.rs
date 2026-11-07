@@ -97,6 +97,25 @@ fn infers_types_from_rules() {
     })).unwrap());
 }
 
+livr::schema! {
+    pub struct NullArguments {
+        // LIVR 2.0 ignored the arguments of `iso_date`: the plain rule
+        day: ["required", {"iso_date": null}],
+        // LIVR 2.0: the value null
+        fallback: ["string", {"default": null}],
+    }
+}
+
+#[test]
+fn null_arguments_of_livr_2_0_rules() {
+    let value = NullArguments::validate(&json!({"day": "2024-02-29"})).unwrap();
+    has_type::<String>(&value.day);
+    assert_eq!(value.day, "2024-02-29");
+    has_type::<Option<Value>>(&value.fallback);
+    assert_eq!(value.fallback, None);
+    assert!(NullArguments::validate(&json!({"day": "2024-02-30"})).is_err());
+}
+
 #[test]
 fn returns_the_errors_of_the_validator() {
     let errors = User::validate(
@@ -334,4 +353,59 @@ fn generated_code_works_without_the_prelude() {
             .unwrap();
     assert_eq!(order.id, 1);
     assert!(no_prelude::Order::validate_owned(json!({"id": 0})).is_err());
+}
+
+// 2026-10-18T12:00:00Z, the current time of the schema below
+fn fixed_now() -> std::time::SystemTime {
+    std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_792_324_800)
+}
+
+livr::schema! {
+    #[clock(fixed_now)]
+    #[alias(from_tomorrow = {"iso_date": {"min": "tomorrow"}})]
+    pub struct Booking {
+        // Built ahead of time
+        born: {"iso_date": {"max": "today"}},
+        // Compiled by the engine: a metarule and an alias
+        starts: {"when": ["kind", {"eq": "event"}, {"iso_datetime": {"min": "today"}}, "any"]},
+        arrives: "from_tomorrow",
+        // A typed nested object
+        stay: {"nested_object": {until: {"iso_date": {"min": "yesterday"}}}},
+    }
+}
+
+#[test]
+fn a_clock_fixes_today_for_all_rules() {
+    let valid = json!({
+        "born": "2026-10-18",
+        "kind": "event",
+        "starts": "2026-10-18T00:00Z",
+        "arrives": "2026-10-19",
+        "stay": {"until": "2026-10-17"},
+    });
+    let booking = Booking::validate(&valid).unwrap();
+    assert_eq!(
+        booking.starts.as_ref().and_then(|v| v.as_str()),
+        Some("2026-10-18T00:00:00.000Z")
+    );
+    assert!(Booking::validator().validate(&valid).is_ok());
+    let invalid = json!({
+        "born": "2026-10-19",
+        "kind": "event",
+        "starts": "2026-10-17T23:59Z",
+        "arrives": "2026-10-18",
+        "stay": {"until": "2026-10-16"},
+    });
+    let expected = json!({
+        "born": "DATE_TOO_LATE",
+        "starts": "DATETIME_TOO_EARLY",
+        "arrives": "DATE_TOO_EARLY",
+        "stay": {"until": "DATE_TOO_EARLY"},
+    });
+    let Err(Errors::Fields(errors)) = Booking::validate_owned(invalid.clone()) else {
+        panic!("expected errors of the fields");
+    };
+    assert_eq!(serde_json::to_value(&errors).unwrap(), expected);
+    let errors = Booking::validator().validate(&invalid).unwrap_err();
+    assert_eq!(serde_json::to_value(&errors).unwrap(), expected);
 }

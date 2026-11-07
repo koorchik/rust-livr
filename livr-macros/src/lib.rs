@@ -39,10 +39,17 @@ fn expand(input: SchemaInput) -> syn::Result<TokenStream2> {
         attrs,
         rules: custom,
         aliases,
+        clock,
         vis,
         name,
         body,
     } = input;
+    let clock = match clock {
+        Some(clock) => {
+            quote! { ::core::option::Option::Some(#clock as fn() -> ::std::time::SystemTime) }
+        }
+        None => quote! { ::core::option::Option::None },
+    };
 
     let (fields, include) = match body {
         Body::Fields(fields) => (fields, None),
@@ -194,13 +201,18 @@ fn expand(input: SchemaInput) -> syn::Result<TokenStream2> {
             pub fn validator() -> &'static ::livr::Validator {
                 static VALIDATOR: ::livr::__private::LazyLock<::livr::Validator> =
                     ::livr::__private::LazyLock::new(|| {
-                        ::livr::Validator::builder(&::livr::__private::json(#main_name::SCHEMA))
-                            .registry(#main_name::__livr_registry())
-                            .build()
-                            .expect("schema checked by schema!")
+                        ::livr::__private::validator(
+                            #main_name::SCHEMA,
+                            #main_name::__livr_registry(),
+                            #main_name::__LIVR_CLOCK,
+                        )
                     });
                 &VALIDATOR
             }
+
+            // The clock of `today` (`#[clock(...)]`), the system clock for None
+            #[doc(hidden)]
+            pub const __LIVR_CLOCK: ::livr::__private::ClockFn = #clock;
 
             #[doc(hidden)]
             pub fn __livr_registry() -> &'static ::livr::Registry {

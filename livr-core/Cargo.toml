@@ -5,9 +5,9 @@ keywords = ["validation", "livr", "validator", "schema", "json"]
 categories = ["data-structures", "encoding"]
 readme = "README.md"
 documentation = "https://docs.rs/livr-core"
-# The LIVR test suite is a copy from the specification (Artistic-2.0): its
-# tests skip it when it is missing
-exclude = ["tests/test_suite"]
+# The LIVR test suites are copies from the specification (Artistic-2.0): its
+# tests skip them when they are missing
+exclude = ["tests/test_suite", "tests/test_suite_2.5"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -32,12 +32,18 @@ impl ListOf {
     #[inline]
     pub fn run<'v>(&self, value: Cow<'v, Value>) -> Checked<'v> {
         match &*value {
-            Value::Array(_) => {
-                // Rules of an item see it as the only field of the data
-                run_items(value, |item| self.item.run_single("field", item))
-            }
+            Value::Array(_) => run_items(value, |item| self.run_item(item)),
             _ if is_no_value(&value) => Ok(value),
             _ => Err(ErrorTree::code("FORMAT_ERROR")),
         }
+    }
+
+    // Items have no object of their own: their rules see no other fields
+    // (LIVR 2.5). Not inlined: with the rules inlined into the loop of
+    // `run_items`, the loop needs a much larger stack frame and the nested
+    // benchmark was 10-15% slower
+    #[inline(never)]
+    fn run_item<'v>(&self, item: Cow<'v, Value>) -> Checked<'v> {
+        self.item.run(item, &Ctx::none())
     }
 }

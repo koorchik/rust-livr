@@ -22,14 +22,21 @@ impl Or {
         Ok(Self { rule_sets })
     }
 
+    /// Whether a rule set reads other fields of the object.
+    #[inline]
+    #[must_use]
+    pub fn reads_ctx(&self) -> bool {
+        self.rule_sets.iter().any(Chain::reads_ctx)
+    }
+
     /// Checks the value.
     #[inline]
-    pub fn check(&self, value: &Value, _ctx: &Ctx<'_>) -> Outcome {
-        // Rules of a set see the value as the only field of the data
-        let ctx = Ctx::single("field", value);
+    pub fn check(&self, value: &Value, ctx: &Ctx<'_>) -> Outcome {
+        // The rule sets are transparent: their rules see the object of the
+        // field (LIVR 2.5)
         let mut outcome = Outcome::Valid;
         for rules in &self.rule_sets {
-            outcome = rules.check(value, &ctx);
+            outcome = rules.check(value, ctx);
             if !outcome.is_error() {
                 return outcome;
             }

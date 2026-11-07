@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Rust implementation of the LIVR specification 2.0 (https://livr-spec.org). Performance matters (measure changes on hot paths with the benchmark), but a convenient public API comes first: don't trade ergonomics for a small speedup. Big measured wins that keep the API are welcome. Type inference of `schema!` must stay sound: for every valid data, the output fits the generated types.
+A Rust implementation of the LIVR specification 2.0 (https://livr-spec.org) and the rules of the LIVR 2.5 draft (`../LIVR/drafts/v2.5.md`). Performance matters (measure changes on hot paths with the benchmark), but a convenient public API comes first: don't trade ergonomics for a small speedup. Big measured wins that keep the API are welcome. Type inference of `schema!` must stay sound: for every valid data, the output fits the generated types.
 
 ## Commands
 
@@ -18,7 +18,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
 cargo publish --workspace --dry-run --allow-dirty  # the published crates build from their packages
 taskset -c 9 cargo bench -p livr                # benchmark (best of 5 runs); pin it, other processes disturb it
 livr-wasm/build.sh && taskset -c 9 node bench-js/bench.mjs   # WebAssembly build and the JavaScript comparison
-cp -r ../LIVR/test_suite livr-core/tests/            # refresh the copy of the LIVR test suite (change it in the specification first)
+cp -r ../LIVR/test_suite ../LIVR/test_suite_2.5 livr-core/tests/   # refresh the copies of the LIVR test suites (change them in the specification first)
 ```
 
 ## Architecture
@@ -30,8 +30,9 @@ cp -r ../LIVR/test_suite livr-core/tests/            # refresh the copy of the L
   - `registry.rs` - `Registry` (no global mutable state; `Registry::builtin()` is a frozen `OnceLock`), `Alias`, camelCase names
   - `validator.rs` - `Validator` (`Arc`, immutable, `Send + Sync`), `validate`, `validate_owned`, `validate_into`
   - `typed.rs` - `FromLivr` (owned), `FromLivrRef` (borrowed), `TypedObject`, `Schema` (the main type of `schema!`), `ConvertError` (becomes `FORMAT_ERROR`, never a panic)
-  - `rules/<group>/<rule>.rs` - one rule per file; `rules/mod.rs` - the `built_in_rules!` list: the `CompiledRule` enum (static dispatch) and the name → builder table
-- `livr-macros` - `schema!`: `parse.rs` (JSON in tokens, `#[rule]`, `#[alias]`), `infer.rs` (type inference), `lib.rs` (checks the schema with livr-core at compile time, generates the code), `aot.rs` (the rules of a field as code)
+  - `rules/<group>/<rule>.rs` - one rule per file; `rules/mod.rs` - the `built_in_rules!` list: the `CompiledRule` enum (static dispatch) and the name → builder table; metarules that read other fields (`when`) are `ctx_metarules`
+  - `reference.rs` (references of `required_if` and `when`), `time.rs` (dates, times, the clock of `today`), `text.rs` (IPv4/IPv6 for `ip` and `cidr`): shared by rule files through the prelude
+- `livr-macros` - `schema!`: `parse.rs` (JSON in tokens, `#[rule]`, `#[alias]`, `#[clock]`), `infer.rs` (type inference), `lib.rs` (checks the schema with livr-core at compile time, generates the code), `aot.rs` (the rules of a field as code)
 - `livr-typed-suite` - build.rs generates a `schema!` and a test for every case of the test suite; also runs the examples of README.md as doctests (the README is outside the published crates)
 - `livr-wasm` - wasm-bindgen wrapper (not published); `bench-js` - benchmark against js-validator-livr
 
@@ -43,7 +44,8 @@ Compiled rules run on `Cow<Value>` (`Checked<'v> = Result<Cow<'v, Value>, ErrorT
 - A borrowed value stays borrowed until a rule changes it; an owned one is moved through the rules. One implementation serves borrowed data (copying only the output) and owned data (copying nothing).
 - A missing field is `Cow::Borrowed(&NULL)`, so an owned result means a rule gave it a value (`default`).
 - Simple rules have `check(&Value, &Ctx) -> Outcome`; metarules have `run(Cow)` too.
-- Owned values cannot be read as other fields, so objects whose rules read other fields (`equal_to_field`, custom rules: `reads_ctx`) are validated borrowed.
+- Owned values cannot be read as other fields, so objects whose rules read other fields (`equal_to_field`, `required_if`, `when`, custom rules, and aliases and `or` that contain them: `reads_ctx`) are validated borrowed.
+- LIVR 2.5: aliases and `or` see the object of the field; list items, values of `values` and keys of `keys` see no other fields (`Ctx::none`).
 
 ### Rule files
 
@@ -51,7 +53,8 @@ Compiled rules run on `Cow<Value>` (`Checked<'v> = Result<Cow<'v, Value>, ErrorT
 - No imports between rule files: repeat small code instead.
 - Metarules use only `CompileCtx::compile_field` / `compile_object`.
 - Expensive work goes to `build`: arguments, regular expressions (cached by pattern in `like`), lookup tables. `check` only checks.
-- Rules skip empty values (`is_no_value`), except `required`, `not_empty` and `not_empty_list`.
+- Rules skip empty values (`is_no_value`), except `required`, `not_empty`, `not_empty_list`, and from LIVR 2.5 `required_if`, `when` and `any`.
+- LIVR 2.5 rules reject arguments they do not take (`no_args`) and ignore the ones after those they take (`first_arg`), unchecked; numbers and strings with numbers are interchangeable in their arguments (`count_arg`, `text_arg`), the 2.0 rules keep their own argument handling. Format and checksum rules use `check_format` (a boolean gets the code of the rule).
 - Non-primitive values are `FORMAT_ERROR` for string, numeric and special rules; modifiers leave them as they are.
 - Invalid arguments are a `SchemaError` from `build` (`arg`, `number_arg`, `string_arg`).
 
@@ -81,7 +84,7 @@ The rules of a field are compiled ahead of time (`aot.rs`): a function per field
 3. Commit, tag `vX.Y.Z`, push, and create a GitHub release from the CHANGELOG entry.
 4. `cargo publish --workspace` publishes livr-core, livr-macros and livr in order and waits for the index (cargo 1.90 or newer).
 5. Then `rust-livr-axum`: raise its `livr` version if it needs the new release, and publish it (see its CLAUDE.md).
-6. The LIVR site ([koorchik/LIVR](https://github.com/koorchik/LIVR)) runs `conformance/rust` against `livr` from crates.io, with the requirement `livr = "0.1"`: a 0.1.x release shows up on the next deploy; for 0.2 update `conformance/rust/Cargo.toml` there. `NATIVE=1 LIVR_RUST_PATH="$PWD/../rust-livr" conformance/run.sh rust`, run in the LIVR checkout, tests this checkout instead (an absolute path; the Docker mode always uses crates.io).
+6. The LIVR site ([koorchik/LIVR](https://github.com/koorchik/LIVR)) runs `conformance/rust` against `livr` from crates.io, with the requirement `livr = "0.2"`: a 0.2.x release shows up on the next deploy; for 0.3 update `conformance/rust/Cargo.toml` there. `NATIVE=1 LIVR_RUST_PATH="$PWD/../rust-livr" conformance/run.sh rust`, run in the LIVR checkout, tests this checkout instead (an absolute path; the Docker mode always uses crates.io).
 
 ## Code style
 

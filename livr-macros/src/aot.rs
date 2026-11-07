@@ -32,13 +32,35 @@ impl Gen<'_> {
     }
 
     /// Whether a rule reads other fields of the object, like
-    /// `Chain::reads_ctx`.
+    /// `Chain::reads_ctx`: aliases and `or` see the object of the field, so
+    /// they read it when their rules do.
     pub(crate) fn reads_ctx(&self, rules: &Value) -> bool {
+        self.reads_ctx_in(rules, &mut Vec::new())
+    }
+
+    fn reads_ctx_in<'r>(&'r self, rules: &'r Value, aliases: &mut Vec<&'r str>) -> bool {
         rule_list(rules).iter().any(|rule| {
-            rule_parts(rule).is_some_and(|(name, _)| {
-                self.infer.is_custom(name)
-                    || self.infer.builtin_name(name) == Some("equal_to_field")
-            })
+            let Some((name, args)) = rule_parts(rule) else {
+                return false;
+            };
+            if self.infer.is_custom(name) {
+                return true;
+            }
+            if let Some(alias_rules) = self.infer.alias_rules(name) {
+                // A recursive alias is a schema error of the engine
+                if aliases.contains(&name) {
+                    return false;
+                }
+                aliases.push(name);
+                let reads_ctx = self.reads_ctx_in(alias_rules, aliases);
+                aliases.pop();
+                return reads_ctx;
+            }
+            match self.infer.builtin_name(name) {
+                Some("equal_to_field" | "required_if" | "when") => true,
+                Some("or") => args.iter().any(|rules| self.reads_ctx_in(rules, aliases)),
+                _ => false,
+            }
         })
     }
 
@@ -70,8 +92,16 @@ impl Gen<'_> {
         };
         match builtin {
             "required" | "not_empty" | "not_empty_list" | "any_object" | "string" | "integer"
-            | "positive_integer" | "decimal" | "positive_decimal" | "email" | "url"
-            | "iso_date" | "trim" | "to_lc" | "to_uc" => constant(quote! { ::livr::rules::#ty }),
+            | "positive_integer" | "decimal" | "positive_decimal" | "email" | "url" | "trim"
+            | "to_lc" | "to_uc" | "boolean" | "any" | "digits" | "hostname" | "hex"
+            | "mongo_id" | "hex_color" | "e164" | "semver" | "jwt" | "luhn" | "credit_card"
+            | "iban" => constant(quote! { ::livr::rules::#ty }),
+            // Without arguments, the rule of LIVR 2.0; an object of bounds
+            // (LIVR 2.5) is built (any other first argument is a schema
+            // error)
+            "iso_date" if !args.first().is_some_and(Value::is_object) => {
+                constant(quote! { ::livr::rules::#ty::new() })
+            }
             "max_length" | "min_length" | "length_equal" | "max_number" | "min_number" => {
                 match number(0) {
                     Some(number) => constant(quote! { ::livr::rules::#ty::new(#number) }),
@@ -86,7 +116,10 @@ impl Gen<'_> {
             | "variable_object"
             | "list_of"
             | "list_of_objects"
-            | "list_of_different_objects" => self.compiled(rule),
+            | "list_of_different_objects"
+            | "when"
+            | "values"
+            | "keys" => self.compiled(rule),
             _ => self.built(&ty, args),
         }
     }
@@ -100,7 +133,7 @@ impl Gen<'_> {
                 ::livr::__private::LazyLock::new(|| {
                     // The registry is built only if the rule compiles
                     // rules (`or`): it is costly on a cold start
-                    ::livr::__private::build(#main::__livr_registry, #args, ::livr::rules::#ty::build)
+                    ::livr::__private::build(#main::__livr_registry, #main::__LIVR_CLOCK, #args, ::livr::rules::#ty::build)
                 });
             ::livr::__private::step(&*RULE, value, ctx)
         }}
@@ -113,7 +146,7 @@ impl Gen<'_> {
         quote! {{
             static RULES: ::livr::__private::LazyLock<::livr::Chain> =
                 ::livr::__private::LazyLock::new(|| {
-                    ::livr::__private::chain(#main::__livr_registry(), #rule)
+                    ::livr::__private::chain(#main::__livr_registry(), #main::__LIVR_CLOCK, #rule)
                 });
             RULES.run(value, ctx)
         }}

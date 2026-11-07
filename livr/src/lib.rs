@@ -1,7 +1,8 @@
 //! A Rust implementation of the LIVR 2.0 specification (Language Independent
 //! Validation Rules, <https://livr-spec.org>). It passes the full official
 //! test suite: all 70 cases, also with camelCase rule names and as typed
-//! schemas. LIVR rules are declarative and the same in all languages.
+//! schemas. The rules of the LIVR 2.5 draft are implemented too. LIVR rules
+//! are declarative and the same in all languages.
 //!
 //! - **All errors in one pass:** every field is checked, in nested objects
 //!   and lists too, and gets the error code of its first failing rule.
@@ -65,6 +66,10 @@
 //!
 //! The main type implements [`Schema`], for code generic over schemas, like
 //! the extractors of [livr-axum](https://github.com/koorchik/rust-livr-axum).
+//! `#[rule(name = builder)]` and `#[alias(name = rules)]` before the struct
+//! add custom rules and aliases; `#[clock(path)]`, a `fn() -> SystemTime`,
+//! is the clock of the bounds `today`, `yesterday` and `tomorrow` (LIVR 2.5),
+//! like [`ValidatorBuilder::clock`].
 //!
 //! # Custom rules
 //!
@@ -159,25 +164,44 @@ pub mod __private {
         serde_json::from_str(json).expect("JSON checked by schema!")
     }
 
+    /// The clock of `#[clock(...)]`, `None` for the system clock.
+    pub type ClockFn = Option<fn() -> std::time::SystemTime>;
+
     /// A rule built from its arguments, checked at compile time. The
     /// registry is got only if the rule compiles other rules.
     pub fn build<R>(
         registry: fn() -> &'static Registry,
+        clock: ClockFn,
         args: &str,
         build: impl FnOnce(&[Value], &mut CompileCtx<'_>) -> Result<R, SchemaError>,
     ) -> R {
         let Value::Array(args) = json(args) else {
             unreachable!("arguments are a list")
         };
-        build(&args, &mut CompileCtx::lazy(registry)).expect("arguments checked by schema!")
+        build(&args, &mut CompileCtx::lazy(registry).with_clock_fn(clock))
+            .expect("arguments checked by schema!")
     }
 
     /// Rules compiled by the engine, checked at compile time.
     #[must_use]
-    pub fn chain(registry: &Registry, rules: &str) -> Chain {
+    pub fn chain(registry: &Registry, clock: ClockFn, rules: &str) -> Chain {
         CompileCtx::new(registry)
+            .with_clock_fn(clock)
             .compile_field(&json(rules))
             .expect("rules checked by schema!")
+    }
+
+    /// The validator of the schema, with the clock of `#[clock(...)]`.
+    #[must_use]
+    pub fn validator(schema: &str, registry: &Registry, clock: ClockFn) -> crate::Validator {
+        let schema = json(schema);
+        let builder = crate::Validator::builder(&schema).registry(registry);
+        match clock {
+            Some(clock) => builder.clock(clock),
+            None => builder,
+        }
+        .build()
+        .expect("schema checked by schema!")
     }
 
     /// Runs a rule on a value, like a `Chain` does.
@@ -367,24 +391,14 @@ pub mod __private {
         items(value?, |item| convert(single(&rules, reads_ctx, item)?))
     }
 
-    // Runs rules on a value validated on its own, like `Chain::run_single`
+    // Runs rules on a list item, like `list_of`: items have no object of
+    // their own, their rules see no other fields (LIVR 2.5)
     #[inline]
     fn single<'v>(
         rules: &impl for<'a> Fn(Cow<'a, Value>, &Ctx<'_>) -> Checked<'a>,
-        reads_ctx: bool,
+        _reads_ctx: bool,
         value: Cow<'v, Value>,
     ) -> Checked<'v> {
-        match value {
-            Cow::Borrowed(value) => rules(Cow::Borrowed(value), &Ctx::single("field", value)),
-            // The rules read the value as a field: they get it borrowed
-            Cow::Owned(value) if reads_ctx => {
-                let output = match rules(Cow::Borrowed(&value), &Ctx::single("field", &value))? {
-                    Cow::Borrowed(_) => None,
-                    Cow::Owned(output) => Some(output),
-                };
-                Ok(Cow::Owned(output.unwrap_or(value)))
-            }
-            value => rules(value, &Ctx::none()),
-        }
+        rules(value, &Ctx::none())
     }
 }

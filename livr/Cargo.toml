@@ -1,6 +1,6 @@
 [package]
 name = "livr"
-description = "LIVR 2.0 validator for Rust: all errors at once, rules as JSON, types inferred from schemas"
+description = "LIVR 2.0 validator for Rust, with the LIVR 2.5 draft rules: all errors at once, rules as JSON, types inferred from schemas"
 keywords = ["validation", "livr", "validator", "schema", "json"]
 categories = ["data-structures", "encoding"]
 # The README of the repository: cargo packages it as README.md

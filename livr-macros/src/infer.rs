@@ -158,6 +158,40 @@ const BUILT_IN_RULES: &[&str] = &[
     "remove",
     "leave_only",
     "default",
+    // LIVR 2.5
+    "boolean",
+    "any",
+    "required_if",
+    "not_one_of",
+    "digits",
+    "starts_with",
+    "ends_with",
+    "contains",
+    "max_decimals",
+    "iso_datetime",
+    "iso_time",
+    "when",
+    "values",
+    "keys",
+    "list_length",
+    "unique",
+    "split",
+    "uuid",
+    "ip",
+    "cidr",
+    "hostname",
+    "base64",
+    "hex",
+    "digest",
+    "mongo_id",
+    "hex_color",
+    "mac",
+    "e164",
+    "semver",
+    "jwt",
+    "luhn",
+    "credit_card",
+    "iban",
 ];
 
 enum Resolved<'a> {
@@ -244,6 +278,14 @@ impl<'a> Infer<'a> {
     pub fn builtin_name(&self, name: &str) -> Option<&'static str> {
         match self.resolve(name)? {
             Resolved::Builtin(rule) => Some(rule),
+            _ => None,
+        }
+    }
+
+    /// The rules of the alias of a name, unless a custom rule has it.
+    pub fn alias_rules(&self, name: &str) -> Option<&'a Value> {
+        match self.resolve(name)? {
+            Resolved::Alias(_, rules) => Some(rules),
             _ => None,
         }
     }
@@ -345,7 +387,8 @@ impl<'a> Infer<'a> {
         let arg = |i: usize| args.get(i).unwrap_or(&Value::Null);
         match rule {
             "required" => state.present = true,
-            "not_empty" | "equal_to_field" => {}
+            // The value does not change: an empty one may stay
+            "not_empty" | "equal_to_field" | "required_if" | "not_one_of" | "any" => {}
             "not_empty_list" => {
                 state.present = true;
                 if !matches!(state.ty, Ty::List(..)) {
@@ -355,7 +398,10 @@ impl<'a> Infer<'a> {
             "any_object" => state.ty = Ty::Map,
             // String rules output strings, a narrower type stays
             "string" | "email" | "url" | "iso_date" | "like" | "min_length" | "max_length"
-            | "length_between" | "length_equal" => {
+            | "length_between" | "length_equal" | "digits" | "starts_with" | "ends_with"
+            | "contains" | "iso_datetime" | "iso_time" | "uuid" | "ip" | "cidr" | "hostname"
+            | "base64" | "hex" | "digest" | "mongo_id" | "hex_color" | "mac" | "e164"
+            | "semver" | "jwt" | "luhn" | "credit_card" | "iban" => {
                 if !self.is_str_enum(&state.ty) {
                     state.ty = Ty::String;
                 }
@@ -370,7 +416,15 @@ impl<'a> Infer<'a> {
             }
             "integer" | "positive_integer" => state.ty = Ty::I64,
             "decimal" | "positive_decimal" => state.ty = Ty::F64,
-            "min_number" | "max_number" | "number_between" => {
+            "boolean" => state.ty = Ty::Bool,
+            // Objects of any keys: the values may be of any type
+            "values" | "keys" => state.ty = Ty::Map,
+            "list_length" | "unique" => {
+                if !matches!(state.ty, Ty::List(..)) {
+                    state.ty = Ty::List(Box::new(Ty::Value), false);
+                }
+            }
+            "min_number" | "max_number" | "number_between" | "max_decimals" => {
                 if !matches!(state.ty, Ty::I64 | Ty::F64) {
                     state.ty = Ty::F64;
                 }

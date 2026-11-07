@@ -1,8 +1,9 @@
 //! The engine of the [`livr`](https://docs.rs/livr) crate. Use `livr`, which
 //! re-exports this crate and adds typed schemas.
 //!
-//! LIVR 2.0 (Language Independent Validation Rules, <https://livr-spec.org>):
-//! declarative validation rules, the same in all languages.
+//! LIVR 2.0 (Language Independent Validation Rules, <https://livr-spec.org>)
+//! and the rules of the LIVR 2.5 draft: declarative validation rules, the
+//! same in all languages.
 //!
 //! ```
 //! use livr_core::Validator;
@@ -24,6 +25,7 @@
 
 mod compile;
 mod error;
+mod reference;
 mod registry;
 mod rule;
 /// The built-in rules, one type per rule.
@@ -32,6 +34,8 @@ mod rule;
 /// directly. Use the rules by name in schemas.
 #[doc(hidden)]
 pub mod rules;
+mod text;
+mod time;
 mod trim;
 mod typed;
 pub mod util;

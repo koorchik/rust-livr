@@ -1,6 +1,7 @@
 //! The validator: a compiled schema, and its builder.
 
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -8,6 +9,7 @@ use serde_json::Value;
 use crate::compile::{CompileCtx, ObjectValidator};
 use crate::error::{Errors, SchemaError, ValidateIntoError};
 use crate::registry::Registry;
+use crate::time::{Clock, system_time_ms};
 use crate::trim::{trim_deep, trim_deep_owned};
 
 /// A compiled schema. Compiled once, immutable, cheap to clone and safe to
@@ -51,6 +53,7 @@ impl Validator {
             schema,
             registry: None,
             auto_trim: false,
+            clock: Clock::System,
         }
     }
 
@@ -141,6 +144,7 @@ pub struct ValidatorBuilder<'a> {
     schema: &'a Value,
     registry: Option<&'a Registry>,
     auto_trim: bool,
+    clock: Clock,
 }
 
 impl<'a> ValidatorBuilder<'a> {
@@ -157,6 +161,37 @@ impl<'a> ValidatorBuilder<'a> {
         self
     }
 
+    /// Fixes the current time for the bounds `today`, `yesterday` and
+    /// `tomorrow` of `iso_date` and `iso_datetime` (LIVR 2.5), for tests. By
+    /// default they use the system time, in UTC.
+    ///
+    /// ```
+    /// use std::time::{Duration, UNIX_EPOCH};
+    /// use livr_core::Validator;
+    /// use serde_json::json;
+    ///
+    /// // 2026-10-18T12:00:00Z
+    /// let now = UNIX_EPOCH + Duration::from_secs(1_792_324_800);
+    /// let validator = Validator::builder(&json!({"date": {"iso_date": {"max": "today"}}}))
+    ///     .now(now)
+    ///     .build()?;
+    /// assert!(validator.validate(&json!({"date": "2026-10-18"})).is_ok());
+    /// assert!(validator.validate(&json!({"date": "2026-10-19"})).is_err());
+    /// # Ok::<(), livr_core::SchemaError>(())
+    /// ```
+    pub fn now(mut self, now: SystemTime) -> Self {
+        self.clock = Clock::Fixed(system_time_ms(now));
+        self
+    }
+
+    /// The clock for the bounds `today`, `yesterday` and `tomorrow` of
+    /// `iso_date` and `iso_datetime` (LIVR 2.5), called for every value
+    /// checked against such a bound. [`SystemTime::now`] by default.
+    pub fn clock(mut self, clock: fn() -> SystemTime) -> Self {
+        self.clock = Clock::Function(clock);
+        self
+    }
+
     /// Compiles the schema.
     ///
     /// # Errors
@@ -164,7 +199,9 @@ impl<'a> ValidatorBuilder<'a> {
     /// A [`SchemaError`] for an invalid schema.
     pub fn build(self) -> Result<Validator, SchemaError> {
         let registry = self.registry.unwrap_or_else(|| Registry::builtin());
-        let object = CompileCtx::new(registry).compile_object(self.schema)?;
+        let object = CompileCtx::new(registry)
+            .with_clock(self.clock)
+            .compile_object(self.schema)?;
         Ok(Validator {
             inner: Arc::new(Inner {
                 object,

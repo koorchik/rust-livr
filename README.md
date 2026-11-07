@@ -7,7 +7,7 @@
 [![MSRV 1.88](https://img.shields.io/badge/MSRV-1.88-orange)](https://blog.rust-lang.org/2025/06/26/Rust-1.88.0/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/koorchik/rust-livr/blob/master/LICENSE)
 
-A Rust implementation of the [LIVR 2.0 specification](https://livr-spec.org) (Language Independent Validation Rules). It passes the full official test suite: all 70 cases, also with camelCase rule names and as typed schemas.
+A Rust implementation of the [LIVR 2.0 specification](https://livr-spec.org) (Language Independent Validation Rules). It passes the full official test suite: all 70 cases, also with camelCase rule names and as typed schemas. The rules of the LIVR 2.5 draft are implemented too ([below](#livr-25-draft)).
 
 **Every error of every field, in one response.** livr never stops at the first error: it checks all the fields, in nested objects and in every item of a list, and gives an error code for each invalid one, the type errors too. The frontend highlights every wrong field at once.
 
@@ -125,7 +125,7 @@ When another crate fits better:
 
 ```toml
 [dependencies]
-livr = "0.1"
+livr = "0.2"
 serde_json = "1"
 ```
 
@@ -183,10 +183,12 @@ Each field's rules are folded into a type and a presence, in order:
 
 | Rules | Type |
 |---|---|
-| `string`, `email`, `url`, `iso_date`, `like`, length rules | `String` (an enum from an earlier `one_of` stays) |
+| `string`, `email`, `url`, `iso_date`, `like`, length rules; LIVR 2.5: `digits`, `starts_with`, `ends_with`, `contains`, `iso_datetime`, `iso_time`, format and checksum rules | `String` (an enum from an earlier `one_of` stays) |
+| `boolean` (LIVR 2.5) | `bool` |
+| `values`, `keys` (LIVR 2.5) | `Map<String, Value>` |
 | `integer`, `positive_integer` | `i64` |
 | `decimal`, `positive_decimal` | `f64` |
-| `min_number`, `max_number`, `number_between` | the earlier number type, else `f64` |
+| `min_number`, `max_number`, `number_between`, `max_decimals` | the earlier number type, else `f64` |
 | `one_of` of strings | a generated enum (`as_str()`, `Display`) |
 | `one_of` / `eq` of other values | `i64`, `f64`, `bool`, or `Value` when mixed |
 | `nested_object` | a generated struct |
@@ -195,7 +197,8 @@ Each field's rules are folded into a type and a presence, in order:
 | `or` | the type of the rule sets when it is the same, else an untagged enum |
 | `any_object` | `Map<String, Value>` |
 | `trim`, `to_lc`, `to_uc`, `remove`, `leave_only` | `String`; `Value` when the earlier type is unknown, since objects pass through them unchanged |
-| `default` | the earlier type |
+| `default`; LIVR 2.5: `not_one_of`, `required_if`, `any` | the earlier type |
+| `list_length`, `unique` (LIVR 2.5) | the earlier list type, else `Vec<Value>` |
 | no rule that tells the type | `Value` |
 
 A field is `T` when a rule makes it present (`required`, `not_empty_list`, a non-empty `default`), and `Option<T>` otherwise. An empty value (missing, `null` or `""`) of an optional field is `None`. `trim`, `remove` and `leave_only` can leave an empty string, so after them a field is optional again until another `required`.
@@ -225,7 +228,7 @@ livr::schema! {
 }
 ```
 
-`#[rule(...)]` takes `output = Type` (the type does not change when it is left out) and `present` (the rule makes the field present). The output type implements `livr::FromLivr` and `livr::FromLivrRef`.
+`#[rule(...)]` takes `output = Type` (the type does not change when it is left out) and `present` (the rule makes the field present). The output type implements `livr::FromLivr` and `livr::FromLivrRef`. `#[clock(path)]` sets the clock of `today` ([LIVR 2.5](#livr-25-draft)).
 
 ## Schemas known at run time: `Validator`
 
@@ -282,7 +285,7 @@ fn main() -> Result<(), livr::SchemaError> {
 }
 ```
 
-A rule builder gets the arguments of the rule in the schema and returns the rule. Expensive work, such as parsing arguments and compiling nested rules with `CompileCtx::compile_field` and `compile_object`, happens once in the builder. A rule returns `Outcome::Valid`, `Outcome::Value(new value)` or `Outcome::Error(...)`. `ctx.field(name)` gives the raw value of another field of the same object. Every rule is also registered under its camelCase name (`minLength`).
+A rule builder gets the arguments of the rule in the schema and returns the rule. Expensive work, such as parsing arguments and compiling nested rules with `CompileCtx::compile_field` and `compile_object`, happens once in the builder. A rule returns `Outcome::Valid`, `Outcome::Value(new value)` or `Outcome::Error(...)`. `ctx.field(name)` gives the raw value of another field of the same object: rules in aliases and `or` see the object of the field, rules of list items see no other fields (LIVR 2.5). Every rule is also registered under its camelCase name (`minLength`).
 
 ## Semantics
 
@@ -295,6 +298,38 @@ These follow the LIVR specification and its test suite. Where the specification 
 - **Rule objects** have exactly one rule name. `{"required": [], "email": []}` is a schema error.
 - **`like`** takes JavaScript regular expressions (without the `u` flag) and matches like JavaScript: `\d`, `\w` and `\b` are ASCII only, also with the `i` flag (`k` matches `K` but not the Kelvin sign `K`); `\s` is the whitespace of JavaScript; `.` does not match line terminators; an escaped letter without a meaning is the letter (`\z` is `z`, `\p{L}` is `p{L}`). Look-around, backreferences and inline flags are schema errors. A character beyond U+FFFF is one character, not two UTF-16 units as in JavaScript. Matching takes linear time.
 - **Numbers to strings** follow JavaScript: `10.0` is `"10"`.
+
+## LIVR 2.5 draft
+
+The rules of the [LIVR 2.5 draft](https://github.com/koorchik/LIVR/blob/master/drafts/v2.5.md), with its test suite (`livr-core/tests/test_suite_2.5`):
+
+- types and numbers: `boolean`, `not_one_of`, `max_decimals`;
+- strings: `digits`, `starts_with`, `ends_with`, `contains`;
+- dates and times: `iso_date` with `{"min": ..., "max": ...}` (dates, `today`, `yesterday`, `tomorrow`), `iso_datetime` (the output is the instant in UTC), `iso_time`;
+- presence and metarules: `required_if`, `when`, `values`, `keys`, `any`;
+- lists and modifiers: `list_length`, `unique`, `split`;
+- formats: `uuid`, `ip`, `cidr`, `hostname`, `base64`, `hex`, `digest`, `mongo_id`, `hex_color`, `mac`, `e164`, `semver`, `jwt`;
+- checksums: `luhn`, `credit_card`, `iban`.
+
+`required_if` and `when` refer to other fields of the containing object, also by path (`"address/country"`). Aliases and `or` see the object of the field (so `equal_to_field` works in them), items of `list_of` see no other fields. The new rules reject arguments they do not take and ignore the arguments after the ones they take (`{"split": [",", ";"]}` splits at `,`); in their arguments a number and a string with a number are the same (`{"max_decimals": "2"}`, `{"split": 1}`). The 2.0 rules keep ignoring extra arguments. An empty list of rules in `when`, `values` or `keys` is a schema error: `"any"` is the branch without rules. `iso_date` takes nothing or an options object first: `{"iso_date": "today"}` was ignored by LIVR 2.0 and is a schema error now.
+
+`today` is the current date in UTC. Rust cannot replace the system clock in tests, so the validator takes one: `Validator::builder(&schema).now(time)` fixes the time, `.clock(function)` sets where it comes from. A typed schema takes a `fn() -> SystemTime` with `#[clock(path)]`, read when a value is checked against such a bound:
+
+```rust
+fn now() -> std::time::SystemTime {
+    std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_792_324_800) // 2026-10-18T12:00:00Z
+}
+
+livr::schema! {
+    #[clock(now)]
+    pub struct Booking {
+        born: {"iso_date": {"max": "today"}},
+    }
+}
+
+assert!(Booking::validate(&serde_json::json!({"born": "2026-10-18"})).is_ok());
+assert!(Booking::validate(&serde_json::json!({"born": "2026-10-19"})).is_err());
+```
 
 ## axum: `livr-axum`
 
@@ -334,14 +369,14 @@ The typed path is the fast one. Its rules are compiled ahead of time: the genera
 
 ## Tests
 
-`cargo test --workspace` runs the LIVR test suite (`livr-core/tests/test_suite`, a copy of the one in the specification, under its own license, Artistic-2.0; it is not in the published crates):
+`cargo test --workspace` runs the LIVR test suites (`livr-core/tests/test_suite` and `test_suite_2.5`, copies of the ones in the specification, under their own license, Artistic-2.0; they are not in the published crates):
 - with borrowed and owned data;
 - again with camelCase rule names;
 - with every case as a `schema!` (`livr-typed-suite`);
 - plus compile-fail tests of `schema!` (`livr/tests/ui`).
 
-To refresh the suite: `cp -r ../LIVR/test_suite livr-core/tests/`.
+To refresh the suites: `cp -r ../LIVR/test_suite ../LIVR/test_suite_2.5 livr-core/tests/`. The cases that fix the current time (`options.json`) use `ValidatorBuilder::now`, and `#[clock(...)]` in the typed suite.
 
 ## License
 
-[MIT](https://github.com/koorchik/rust-livr/blob/master/LICENSE). The copy of the LIVR test suite in `livr-core/tests/test_suite` is under the [Artistic License 2.0](https://livr-spec.org/license-and-copyright.html), like the specification.
+[MIT](https://github.com/koorchik/rust-livr/blob/master/LICENSE). The copies of the LIVR test suites in `livr-core/tests/test_suite` and `test_suite_2.5` are under the [Artistic License 2.0](https://livr-spec.org/license-and-copyright.html), like the specification.

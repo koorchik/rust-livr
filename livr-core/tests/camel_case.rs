@@ -1,4 +1,4 @@
-//! The LIVR test suite again, with the camelCase names of the rules.
+//! The LIVR test suites again, with the camelCase names of the rules.
 
 mod common;
 
@@ -33,12 +33,34 @@ fn camelize_rule(rule: &Value) -> Value {
             for (name, args) in rule {
                 let args = match name.as_str() {
                     "nested_object" | "list_of_objects" => camelize_schema(args),
-                    "list_of" => match args {
+                    "list_of" | "values" | "keys" => match args {
                         // The old syntax: one list of rules
                         Value::Array(items) if items.len() == 1 && items[0].is_array() => {
                             Value::Array(vec![camelize_rules(&items[0])])
                         }
                         other => camelize_rules(other),
+                    },
+                    // The reference stays, the rules of the condition form
+                    // or of the cases are converted
+                    "when" => match args {
+                        Value::Array(items) if items.len() == 2 => {
+                            let cases = match &items[1] {
+                                Value::Object(cases) => Value::Object(
+                                    cases
+                                        .iter()
+                                        .map(|(key, rules)| (key.clone(), camelize_rules(rules)))
+                                        .collect(),
+                                ),
+                                other => other.clone(),
+                            };
+                            Value::Array(vec![items[0].clone(), cases])
+                        }
+                        Value::Array(items) if !items.is_empty() => Value::Array(
+                            std::iter::once(items[0].clone())
+                                .chain(items[1..].iter().map(camelize_rules))
+                                .collect(),
+                        ),
+                        other => other.clone(),
                     },
                     "or" => match args {
                         Value::Array(sets) => {

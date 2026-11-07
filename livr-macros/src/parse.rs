@@ -14,6 +14,8 @@ pub struct SchemaInput {
     pub attrs: Vec<Attribute>,
     pub rules: Vec<CustomRule>,
     pub aliases: Vec<AliasAttr>,
+    // `#[clock(path::to::now)]`: a `fn() -> SystemTime` for `today`
+    pub clock: Option<syn::Path>,
     pub vis: Visibility,
     pub name: Ident,
     pub body: Body,
@@ -55,11 +57,17 @@ impl Parse for SchemaInput {
         let mut attrs = Vec::new();
         let mut rules = Vec::new();
         let mut aliases = Vec::new();
+        let mut clock = None;
         for attr in input.call(Attribute::parse_outer)? {
             if attr.path().is_ident("rule") {
                 rules.push(attr.parse_args_with(parse_custom_rule)?);
             } else if attr.path().is_ident("alias") {
                 aliases.push(attr.parse_args_with(parse_alias)?);
+            } else if attr.path().is_ident("clock") {
+                if clock.is_some() {
+                    return Err(syn::Error::new_spanned(attr, "a second `#[clock(...)]`"));
+                }
+                clock = Some(attr.parse_args::<syn::Path>()?);
             } else {
                 attrs.push(attr);
             }
@@ -112,6 +120,7 @@ impl Parse for SchemaInput {
             attrs,
             rules,
             aliases,
+            clock,
             vis,
             name,
             body,

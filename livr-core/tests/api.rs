@@ -25,9 +25,9 @@ fn validator_is_send_sync_and_cheap_to_clone() {
 fn custom_rules_get_arguments_and_siblings() {
     let mut registry = Registry::default();
     registry.register_rule(
-        "starts_with",
+        "has_prefix",
         rule_builder(|args, _ctx| {
-            let prefix = livr_core::util::string_arg(args, 0, "starts_with")?;
+            let prefix = livr_core::util::string_arg(args, 0, "has_prefix")?;
             Ok(rule_fn(move |value, _ctx| match value {
                 Value::String(str) if !str.starts_with(&prefix) => Outcome::code("WRONG_PREFIX"),
                 _ => Outcome::Valid,
@@ -47,9 +47,9 @@ fn custom_rules_get_arguments_and_siblings() {
         }),
     );
     let schema = json!({
-        "code": {"starts_with": "X-"},
+        "code": {"has_prefix": "X-"},
         "nick": "not_same_as_name",
-        "items": {"list_of": {"starts_with": "I-"}},
+        "items": {"list_of": {"has_prefix": "I-"}},
     });
     let validator = Validator::builder(&schema)
         .registry(&registry)
@@ -68,9 +68,9 @@ fn custom_rules_get_arguments_and_siblings() {
         json!({"code": "WRONG_PREFIX", "nick": "SAME_AS_NAME", "items": [null, "WRONG_PREFIX"]})
     );
     // camelCase names are registered too
-    assert!(registry.contains("startsWith"));
+    assert!(registry.contains("hasPrefix"));
     // The built-in rules are not changed
-    assert!(!Registry::builtin().contains("starts_with"));
+    assert!(!Registry::builtin().contains("has_prefix"));
 }
 
 #[test]
@@ -260,6 +260,132 @@ fn null_fields_stay_in_the_output() {
         validate(json!({"a": {"default": 5}}), json!({})),
         Ok(json!({"a": 5}))
     );
+}
+
+#[test]
+fn null_is_one_null_argument() {
+    // No rule of LIVR 2.5 takes `null`: a schema error
+    for rule in [
+        "boolean",
+        "uuid",
+        "unique",
+        "iso_time",
+        "iso_datetime",
+        "ip",
+        "cidr",
+        "base64",
+        "mac",
+        "any",
+        "hex",
+        "jwt",
+        "iban",
+        "split",
+        "list_length",
+        "max_decimals",
+        "not_one_of",
+    ] {
+        let schema = json!({"a": {rule: null}});
+        assert!(Validator::new(&schema).is_err(), "{schema}");
+    }
+    for schema in [
+        json!({"a": {"not_one_of": [null]}}),
+        json!({"a": {"required_if": {"type": null}}}),
+        json!({"a": {"list_length": {"min": null}}}),
+    ] {
+        assert!(Validator::new(&schema).is_err(), "{schema}");
+    }
+    // LIVR 2.0 ignored the arguments of `iso_date`: the plain rule
+    assert_eq!(
+        validate(
+            json!({"day": {"iso_date": null}}),
+            json!({"day": "2024-02-29"})
+        ),
+        Ok(json!({"day": "2024-02-29"}))
+    );
+    assert_eq!(
+        validate(
+            json!({"day": {"iso_date": null}}),
+            json!({"day": "2023-02-29"})
+        ),
+        Err(json!({"day": "WRONG_DATE"}))
+    );
+    // The rules of LIVR 2.0 get `null` as an argument, as in 2.0
+    assert!(Validator::new(&json!({"a": {"max_length": null}})).is_err());
+    assert!(Validator::new(&json!({"a": {"one_of": null}})).is_err());
+    assert!(Validator::new(&json!({"a": {"list_of": null}})).is_err());
+    // `{"default": null}` gives empty fields the value null
+    assert_eq!(
+        validate(
+            json!({"a": {"default": null}, "b": {"default": null}}),
+            json!({"a": ""})
+        ),
+        Ok(json!({"a": null, "b": null}))
+    );
+    // Custom rules get `[null]`, as in LIVR 2.0
+    let mut registry = Registry::default();
+    registry.register_rule(
+        "args_count",
+        rule_builder(|args, _ctx| {
+            let count = args.len();
+            Ok(rule_fn(move |_, _| Outcome::Value(json!(count))))
+        }),
+    );
+    let validator = Validator::builder(&json!({"a": {"args_count": null}, "b": "args_count"}))
+        .registry(&registry)
+        .build()
+        .unwrap();
+    assert_eq!(
+        validator.validate(&json!({"a": 1, "b": 1})).unwrap(),
+        json!({"a": 1, "b": 0})
+    );
+}
+
+#[test]
+fn unique_key_values_that_are_objects_or_lists_are_format_errors() {
+    // Also when another key of the item is empty or missing
+    for items in [
+        json!([{"a": "", "b": {"x": 1}}]),
+        json!([{"b": [1]}]),
+        json!([{"a": {"x": 1}, "b": null}]),
+    ] {
+        assert_eq!(
+            validate(
+                json!({"list": {"unique": ["a", "b"]}}),
+                json!({"list": items})
+            ),
+            Err(json!({"list": "FORMAT_ERROR"}))
+        );
+    }
+}
+
+#[test]
+fn eq_and_one_of_match_booleans_by_their_string_form() {
+    // "true" and "false" match booleans in both directions, as in LIVR 2.0
+    // (the only boolean strings it matched); the output is the argument
+    assert_eq!(
+        validate(
+            json!({"a": {"eq": true}, "b": {"eq": "false"}}),
+            json!({"a": "true", "b": false})
+        ),
+        Ok(json!({"a": true, "b": "false"}))
+    );
+    assert_eq!(
+        validate(
+            json!({"a": {"one_of": [true, false]}, "b": {"one_of": ["true", "false"]}}),
+            json!({"a": "false", "b": true})
+        ),
+        Ok(json!({"a": false, "b": "true"}))
+    );
+    for value in ["1", "True", "TRUE", "t", "yes"] {
+        assert_eq!(
+            validate(
+                json!({"a": {"eq": true}, "b": {"one_of": [true]}}),
+                json!({"a": value, "b": value})
+            ),
+            Err(json!({"a": "NOT_ALLOWED_VALUE", "b": "NOT_ALLOWED_VALUE"})),
+            "{value}"
+        );
+    }
 }
 
 #[test]

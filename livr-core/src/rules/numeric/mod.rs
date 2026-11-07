@@ -5,6 +5,8 @@
 pub mod decimal;
 /// The `integer` rule.
 pub mod integer;
+/// The `max_decimals` rule.
+pub mod max_decimals;
 /// The `max_number` rule.
 pub mod max_number;
 /// The `min_number` rule.
