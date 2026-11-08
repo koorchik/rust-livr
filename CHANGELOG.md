@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2 (2026-11-08)
+
+- Changed, as LIVR 2.5 specifies now: `url` rejects a dot after the host
+  (`https://example.com.`), host labels longer than 63 characters and ports
+  above 65535, and accepts one-digit ports (`https://example.com:8`). The
+  rest of its grammar is the same: Unicode hosts, user info, `localhost` and
+  IPv4 addresses pass as before. The copy of the 2.5 test suite has the new
+  cases.
+
 ## 0.2.1 (2026-11-07)
 
 - Docs: LIVR 2.5 is released, not a draft. The README lists all the rules,
